@@ -12,6 +12,7 @@ type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (
   ? I
   : never;
 
+/**Type for defining a single transition for a specific state machine */
 type Transition<
   S extends StateTemplate,
   FROM extends S["state"],
@@ -20,8 +21,13 @@ type Transition<
   from: S & { state: FROM }
 ) => (S & { state: TO }) | Promise<S & { state: TO }>;
 
+/**Type containing all possible transition functions for a specific state machine */
+type Transitions<S extends StateTemplate> = UnionToIntersection<
+  S["transitions"]
+>;
+
 const createMachine = <S extends StateTemplate>(
-  transitions: UnionToIntersection<S["transitions"]>
+  transitions: Transitions<S>
 ) => {
   return {
     init: <S1 extends S>(
@@ -42,4 +48,4 @@ const createMachine = <S extends StateTemplate>(
 };
 
 export { createMachine };
-export type { Transition };
+export type { Transition, Transitions };

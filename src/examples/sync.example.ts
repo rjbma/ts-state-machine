@@ -1,4 +1,4 @@
-import { createMachine, Transition } from "../state-machine";
+import { createMachine, Transition, Transitions } from "../state-machine";
 
 type TrafficLightState =
   | {
@@ -19,7 +19,7 @@ type TrafficLightState =
       transitions: { toRed: Transition<TrafficLightState, "yellow", "red"> };
     };
 
-const ts: Parameters<typeof createMachine<TrafficLightState>>[0] = {
+const ts: Transitions<TrafficLightState> = {
   toGreen: (s) => ({
     state: "green",
     data: {},

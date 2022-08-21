@@ -1,5 +1,6 @@
-import { createMachine, Transition } from "../state-machine";
+import { createMachine, Transition, Transitions } from "../state-machine";
 
+// define all the possible state for our machine
 type TrafficLightState =
   | {
       state: "red";
@@ -23,7 +24,8 @@ type TrafficLightState =
       };
     };
 
-const ts: Parameters<typeof createMachine<TrafficLightState>>[0] = {
+// define all transitions for our state machine (must match the definition of the machine above)
+const ts: Transitions<TrafficLightState> = {
   redToGreen: (s) =>
     delay(3000, () => ({
       state: "green",
@@ -44,8 +46,11 @@ const ts: Parameters<typeof createMachine<TrafficLightState>>[0] = {
     })),
 };
 
+// infinite loop that will cycle throgh the states
 const run = async () => {
   console.log("started");
+
+  // create the machine with the definitions above
   const machine = createMachine<TrafficLightState>(ts);
   let s = await machine.init({
     state: "green",
@@ -53,6 +58,7 @@ const run = async () => {
     transitions: { greenToYellow: ts.greenToYellow },
   });
 
+  // loop through the states
   while (true) {
     console.log(s.state);
     if (s.state == "green") {
