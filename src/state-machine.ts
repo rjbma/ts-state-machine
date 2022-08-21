@@ -30,10 +30,13 @@ const createMachine = <S extends StateTemplate>(
   transitions: Transitions<S>
 ) => {
   return {
-    init: <S1 extends S>(
-      initialState: S1,
-      initialTransition?: keyof S1["transitions"]
-    ) => {
+    init: <S1 extends S>(initialState: S1) => {
+      return initialState as S;
+    },
+    transitions,
+  };
+};
+
       if (initialTransition) {
         const newState: Promise<S> =
           // @ts-ignore
