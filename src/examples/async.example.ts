@@ -4,63 +4,69 @@ type TrafficLightState =
   | {
       state: "red";
       data: {};
-      transitions: { toGreen: Transition<TrafficLightState, "red", "green"> };
+      transitions: {
+        redToGreen: Transition<TrafficLightState, "red", "green">;
+      };
     }
   | {
       state: "green";
       data: {};
       transitions: {
-        toYellow: Transition<TrafficLightState, "green", "yellow">;
+        greenToYellow: Transition<TrafficLightState, "green", "yellow">;
       };
     }
   | {
       state: "yellow";
       data: {};
-      transitions: { toRed: Transition<TrafficLightState, "yellow", "red"> };
+      transitions: {
+        yellowToRed: Transition<TrafficLightState, "yellow", "red">;
+      };
     };
 
 const ts: Parameters<typeof createMachine<TrafficLightState>>[0] = {
-  toGreen: (s) =>
-    Promise.resolve({
+  redToGreen: (s) =>
+    delay(3000, () => ({
       state: "green",
       data: {},
-      transitions: { toYellow: ts.toYellow },
-    }),
-  toYellow: (s) =>
-    Promise.resolve({
+      transitions: { greenToYellow: ts.greenToYellow },
+    })),
+  greenToYellow: (s) =>
+    delay(5000, () => ({
       state: "yellow",
       data: {},
-      transitions: { toRed: ts.toRed },
-    }),
-  toRed: (s) =>
-    Promise.resolve({
+      transitions: { yellowToRed: ts.yellowToRed },
+    })),
+  yellowToRed: (s) =>
+    delay(500, () => ({
       state: "red",
       data: {},
-      transitions: { toGreen: ts.toGreen },
-    }),
+      transitions: { redToGreen: ts.redToGreen },
+    })),
 };
 
 const run = async () => {
+  console.log("started");
   const machine = createMachine<TrafficLightState>(ts);
-  let s = await machine.init(
-    {
-      state: "green",
-      data: {},
-      transitions: { toYellow: ts.toYellow },
-    },
-    "toYellow"
-  );
+  let s = await machine.init({
+    state: "green",
+    data: {},
+    transitions: { greenToYellow: ts.greenToYellow },
+  });
 
-  console.log(s.state);
-
-  if (s.state == "green") {
-    s = await s.transitions.toYellow(s);
-  } else if (s.state == "yellow") {
-    s = await s.transitions.toRed(s);
+  while (true) {
+    console.log(s.state);
+    if (s.state == "green") {
+      s = await s.transitions.greenToYellow(s);
+    } else if (s.state == "yellow") {
+      s = await s.transitions.yellowToRed(s);
+    } else if (s.state == "red") {
+      s = await s.transitions.redToGreen(s);
+    }
   }
-
-  console.log(s.state);
 };
+
+const delay = <T>(duration: number, fn: () => T): Promise<T> =>
+  new Promise((resolve) => setTimeout(() => resolve(fn()), duration));
 
 const AsyncExample = { run };
 export { AsyncExample };
