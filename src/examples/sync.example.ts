@@ -39,14 +39,11 @@ const ts: Transitions<TrafficLightState> = {
 
 const run = async () => {
   const machine = createMachine<TrafficLightState>(ts);
-  let s = await machine.init(
-    {
-      state: "green",
-      data: {},
-      transitions: { toYellow: ts.toYellow },
-    },
-    "toYellow"
-  );
+  let s = machine.init({
+    state: "green",
+    data: {},
+    transitions: { toYellow: ts.toYellow },
+  });
 
   console.log(s.state);
 

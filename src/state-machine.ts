@@ -1,3 +1,5 @@
+import * as React from "react";
+
 type StateTemplate = {
   state: string;
   data: unknown;
@@ -37,18 +39,39 @@ const createMachine = <S extends StateTemplate>(
   };
 };
 
-      if (initialTransition) {
-        const newState: Promise<S> =
-          // @ts-ignore
-          Promise.resolve(transitions[initialTransition](initialState));
-        return newState;
-      } else {
-        return Promise.resolve(initialState);
-      }
-    },
-    transitions,
-  };
+const useMachine = <S extends StateTemplate>(
+  transitions: Transitions<S>,
+  initialState: S,
+  initialTransition?: keyof S["transitions"]
+) => {
+  const [state, setState] = React.useState(
+    createMachine(transitions).init(initialState)
+  );
+
+  Object.keys(state.transitions).forEach((transitionKey) => {
+    state.transitions[transitionKey] = (currentState: S) => {
+      // @ts-ignore TODO: how to make this type safe?
+      const promise = transitions[transitionKey](currentState);
+      promise.then(setState).catch((err: any) => {
+        throw new Error(
+          "Transitions should never be allowed to fail, should always handle errors. Failed with: " +
+            err?.message || "Unknown error"
+        );
+      });
+      return promise;
+    };
+  });
+
+  // execute the initial transition, if any
+  React.useEffect(() => {
+    if (initialTransition) {
+      // @ts-ignore TODO: how to make this type safe?
+      state.transitions[initialTransition](initialState);
+    }
+  }, []);
+
+  return state;
 };
 
-export { createMachine };
+export { createMachine, useMachine };
 export type { Transition, Transitions };

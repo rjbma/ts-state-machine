@@ -52,7 +52,7 @@ const run = async () => {
 
   // create the machine with the definitions above
   const machine = createMachine<TrafficLightState>(ts);
-  let s = await machine.init({
+  let s = machine.init({
     state: "green",
     data: {},
     transitions: { greenToYellow: ts.greenToYellow },
