@@ -1,6 +1,7 @@
+import { AsyncExample } from "./examples/async.example";
+// import { SyncExample } from "./examples/sync.example";
 import { createMachine } from "./state-machine";
-import { SyncExample } from "./examples/async.example";
 
-SyncExample.run();
+AsyncExample.run();
 
 export { createMachine };

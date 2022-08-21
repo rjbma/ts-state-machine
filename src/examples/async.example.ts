@@ -62,5 +62,5 @@ const run = async () => {
   console.log(s.state);
 };
 
-const SyncExample = { run };
-export { SyncExample };
+const AsyncExample = { run };
+export { AsyncExample };

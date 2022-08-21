@@ -16,7 +16,9 @@ type Transition<
   S extends StateTemplate,
   FROM extends S["state"],
   TO extends S["state"]
-> = (from: S & { state: FROM }) => Promise<S & { state: TO }>;
+> = (
+  from: S & { state: FROM }
+) => (S & { state: TO }) | Promise<S & { state: TO }>;
 
 const createMachine = <S extends StateTemplate>(
   transitions: UnionToIntersection<S["transitions"]>
@@ -29,7 +31,7 @@ const createMachine = <S extends StateTemplate>(
       if (initialTransition) {
         const newState: Promise<S> =
           // @ts-ignore
-          transitions[initialTransition](initialState);
+          Promise.resolve(transitions[initialTransition](initialState));
         return newState;
       } else {
         return Promise.resolve(initialState);
