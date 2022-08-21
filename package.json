@@ -7,10 +7,13 @@
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "/dist"
+  ],
   "scripts": {
-    "start": "env NODE_ENV=development nodemon --watch 'src/**/*.ts' --exec node --inspect=127.0.0.1 -r ts-node/register src/index.ts",
-    "prepublish": "npm run build",
-    "build": "rm -Rf dist/* && tsc ./src/* --outDir dist --declaration",
+    "start": "nodemon src/index.ts",
+    "prepublishOnly": "npm run build",
+    "build": "tsc",
     "test": "jest --watch",
     "coverage": "jest --watch --coverage"
   },

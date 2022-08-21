@@ -1,3 +1,4 @@
+import type { Transition, Transitions } from "./state-machine";
 import { AsyncExample } from "./examples/async.example";
 // import { SyncExample } from "./examples/sync.example";
 import { createMachine } from "./state-machine";
@@ -5,3 +6,4 @@ import { createMachine } from "./state-machine";
 AsyncExample.run();
 
 export { createMachine };
+export type { Transition, Transitions };
