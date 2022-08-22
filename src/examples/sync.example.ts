@@ -21,19 +21,25 @@ type TrafficLightState =
 
 const ts: Transitions<TrafficLightState> = {
   toGreen: (s) => ({
-    state: "green",
-    data: {},
-    transitions: { toYellow: ts.toYellow },
+    immediate: {
+      state: "green",
+      data: {},
+      transitions: { toYellow: ts.toYellow },
+    },
   }),
   toYellow: (s) => ({
-    state: "yellow",
-    data: {},
-    transitions: { toRed: ts.toRed },
+    immediate: {
+      state: "yellow",
+      data: {},
+      transitions: { toRed: ts.toRed },
+    },
   }),
   toRed: (s) => ({
-    state: "red",
-    data: {},
-    transitions: { toGreen: ts.toGreen },
+    immediate: {
+      state: "red",
+      data: {},
+      transitions: { toGreen: ts.toGreen },
+    },
   }),
 };
 
@@ -48,9 +54,9 @@ const run = async () => {
   console.log(s.state);
 
   if (s.state == "green") {
-    s = await s.transitions.toYellow(s);
+    s = s.transitions.toYellow(s).immediate || s;
   } else if (s.state == "yellow") {
-    s = await s.transitions.toRed(s);
+    s = s.transitions.toRed(s).immediate || s;
   }
 
   console.log(s.state);

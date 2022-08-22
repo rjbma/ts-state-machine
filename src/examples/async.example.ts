@@ -3,10 +3,15 @@ import { createMachine, Transition, Transitions } from "../state-machine";
 // define all the possible state for our machine
 type TrafficLightState =
   | {
+      state: "blue";
+      data: {};
+      transitions: {};
+    }
+  | {
       state: "red";
       data: {};
       transitions: {
-        redToGreen: Transition<TrafficLightState, "red", "green">;
+        redToGreen: Transition<TrafficLightState, "red", "blue" | "green">;
       };
     }
   | {
@@ -26,24 +31,34 @@ type TrafficLightState =
 
 // define all transitions for our state machine (must match the definition of the machine above)
 const ts: Transitions<TrafficLightState> = {
-  redToGreen: (s) =>
-    delay(3000, () => ({
-      state: "green",
+  redToGreen: (s) => ({
+    immediate: {
+      state: "blue",
       data: {},
-      transitions: { greenToYellow: ts.greenToYellow },
-    })),
-  greenToYellow: (s) =>
-    delay(5000, () => ({
+      transitions: { yellowToRed: ts.yellowToRed },
+    },
+    deferred: () =>
+      delay(3000, () => ({
+        state: "green",
+        data: {},
+        transitions: { greenToYellow: ts.greenToYellow },
+      })),
+  }),
+
+  greenToYellow: (s) => ({
+    immediate: {
       state: "yellow",
       data: {},
       transitions: { yellowToRed: ts.yellowToRed },
-    })),
-  yellowToRed: (s) =>
-    delay(500, () => ({
+    },
+  }),
+  yellowToRed: (s) => ({
+    immediate: {
       state: "red",
       data: {},
       transitions: { redToGreen: ts.redToGreen },
-    })),
+    },
+  }),
 };
 
 // infinite loop that will cycle throgh the states
@@ -59,14 +74,35 @@ const run = async () => {
   });
 
   // loop through the states
+  console.log(new Date().toISOString(), s.state);
   while (true) {
-    console.log(s.state);
     if (s.state == "green") {
-      s = await s.transitions.greenToYellow(s);
+      const { immediate, deferred } = s.transitions.greenToYellow(s);
+      if (immediate) {
+        s = immediate;
+      }
+      console.log(new Date().toISOString(), s.state);
+      if (deferred) {
+        s = await deferred();
+      }
     } else if (s.state == "yellow") {
-      s = await s.transitions.yellowToRed(s);
+      const { immediate, deferred } = s.transitions.yellowToRed(s);
+      if (immediate) {
+        s = immediate;
+      }
+      console.log(new Date().toISOString(), s.state);
+      if (deferred) {
+        s = await deferred();
+      }
     } else if (s.state == "red") {
-      s = await s.transitions.redToGreen(s);
+      const { immediate, deferred } = s.transitions.redToGreen(s);
+      if (immediate) {
+        s = immediate;
+      }
+      console.log(new Date().toISOString(), s.state);
+      if (deferred) {
+        s = await deferred();
+      }
     }
   }
 };
