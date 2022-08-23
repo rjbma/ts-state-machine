@@ -35,6 +35,13 @@ type Transitions<S extends StateTemplate> = UnionToIntersection<
   S["transitions"]
 >;
 
+type InitialTransition<S extends StateTemplate> = {
+  /**State change that occurs immediately when the transition occurs */
+  immediate: S;
+  /**State change that occurs only after some work (represented by a promise) finishes. The work is triggered when the transition occurs */
+  deferred?: () => Promise<S>;
+};
+
 const createMachine = <S extends StateTemplate>(
   transitions: Transitions<S>
 ) => {
@@ -46,13 +53,13 @@ const createMachine = <S extends StateTemplate>(
   };
 };
 
-const useMachine = <S extends StateTemplate, IS extends S>(
+const useMachine = <S extends StateTemplate>(
   transitions: Transitions<S>,
-  initialState: IS,
-  initialTransition?: keyof IS["transitions"]
+  initialTransition: () => InitialTransition<S>
 ) => {
+  const initialTransitionResult = initialTransition();
   const [state, setState] = React.useState(
-    createMachine(transitions).init(initialState)
+    createMachine(transitions).init(initialTransitionResult.immediate)
   );
 
   Object.keys(state.transitions).forEach((transitionKey) => {
@@ -81,9 +88,19 @@ const useMachine = <S extends StateTemplate, IS extends S>(
 
   // execute the initial transition, if any
   React.useEffect(() => {
-    if (initialTransition && initialState == state) {
-      // @ts-ignore TODO: how to make this type safe?
-      state.transitions[initialTransition](state);
+    if (
+      initialTransitionResult.deferred &&
+      initialTransitionResult.immediate == state
+    ) {
+      initialTransitionResult
+        .deferred()
+        .then(setState)
+        .catch((err: any) => {
+          console.error(
+            "Transitions should never be allowed to fail, should always handle errors. Failed with: " +
+              err?.message || "Unknown error"
+          );
+        });
     }
   }, []);
 
@@ -91,4 +108,4 @@ const useMachine = <S extends StateTemplate, IS extends S>(
 };
 
 export { createMachine, useMachine };
-export type { Transition, Transitions, SpecificState };
+export type { InitialTransition, Transition, Transitions, SpecificState };
