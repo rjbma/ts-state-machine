@@ -1,44 +1,27 @@
-import { createMachine, Transition, Transitions } from "../state-machine";
+import { createMachine, Transition } from "../state-machine";
 
 // define all the possible state for our machine
 type TrafficLightState =
   | {
-      state: "blue";
-      data: {};
-      transitions: {};
-    }
-  | {
       state: "red";
-      data: {};
-      transitions: {
-        redToGreen: Transition<TrafficLightState, "red", "blue" | "green">;
-      };
     }
   | {
       state: "green";
-      data: {};
-      transitions: {
-        greenToYellow: Transition<TrafficLightState, "green", "yellow">;
-      };
     }
   | {
       state: "yellow";
-      data: {};
-      transitions: {
-        yellowToRed: Transition<TrafficLightState, "yellow", "red">;
-      };
     };
 
-// define all transitions for our state machine (must match the definition of the machine above)
-const ts: Transitions<TrafficLightState> = {
+type TrafficLigthTransitions = {
+  redToGreen: Transition<TrafficLightState, "red", "green">;
+  greenToYellow: Transition<TrafficLightState, "green", "yellow">;
+  yellowToRed: Transition<TrafficLightState, "yellow", "red">;
+};
+
+const ts: TrafficLigthTransitions = {
   redToGreen: (s) => ({
-    immediate: {
-      state: "blue",
-      data: {},
-      transitions: { yellowToRed: ts.yellowToRed },
-    },
     deferred: () =>
-      delay(3000, () => ({
+      delay(1000, () => ({
         state: "green",
         data: {},
         transitions: { greenToYellow: ts.greenToYellow },
@@ -46,18 +29,20 @@ const ts: Transitions<TrafficLightState> = {
   }),
 
   greenToYellow: (s) => ({
-    immediate: {
-      state: "yellow",
-      data: {},
-      transitions: { yellowToRed: ts.yellowToRed },
-    },
+    deferred: () =>
+      delay(3000, () => ({
+        state: "yellow",
+        data: {},
+        transitions: { yellowToRed: ts.yellowToRed },
+      })),
   }),
   yellowToRed: (s) => ({
-    immediate: {
-      state: "red",
-      data: {},
-      transitions: { redToGreen: ts.redToGreen },
-    },
+    deferred: () =>
+      delay(500, () => ({
+        state: "red",
+        data: {},
+        transitions: { redToGreen: ts.redToGreen },
+      })),
   }),
 };
 
@@ -66,42 +51,38 @@ const run = async () => {
   console.log("started");
 
   // create the machine with the definitions above
-  const machine = createMachine<TrafficLightState>(ts);
-  let s = machine.init({
-    state: "green",
-    data: {},
-    transitions: { greenToYellow: ts.greenToYellow },
-  });
+  const machine = createMachine<TrafficLightState, TrafficLigthTransitions>(ts);
+  let s = machine.init({ state: "green", data: {} });
 
   // loop through the states
   console.log(new Date().toISOString(), s.state);
   while (true) {
     if (s.state == "green") {
-      const { immediate, deferred } = s.transitions.greenToYellow(s);
+      const { immediate, deferred } = machine.transitions.greenToYellow(s);
       if (immediate) {
         s = immediate;
       }
       console.log(new Date().toISOString(), s.state);
       if (deferred) {
-        s = await deferred();
-      }
-    } else if (s.state == "yellow") {
-      const { immediate, deferred } = s.transitions.yellowToRed(s);
-      if (immediate) {
-        s = immediate;
-      }
-      console.log(new Date().toISOString(), s.state);
-      if (deferred) {
-        s = await deferred();
+        s = (await deferred(s)) || s;
       }
     } else if (s.state == "red") {
-      const { immediate, deferred } = s.transitions.redToGreen(s);
+      const { immediate, deferred } = ts.redToGreen(s);
       if (immediate) {
         s = immediate;
       }
       console.log(new Date().toISOString(), s.state);
       if (deferred) {
-        s = await deferred();
+        s = (await deferred(s)) || s;
+      }
+    } else if (s.state == "yellow") {
+      const { immediate, deferred } = ts.yellowToRed(s);
+      if (immediate) {
+        s = immediate;
+      }
+      console.log(new Date().toISOString(), s.state);
+      if (deferred) {
+        s = (await deferred(s)) || s;
       }
     }
   }

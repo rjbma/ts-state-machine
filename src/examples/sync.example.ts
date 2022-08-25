@@ -1,50 +1,48 @@
-import { createMachine, Transition, Transitions } from "../state-machine";
+import { createMachine, Transition } from "../state-machine";
 
 type TrafficLightState =
   | {
       state: "red";
       data: {};
-      transitions: { toGreen: Transition<TrafficLightState, "red", "green"> };
     }
   | {
       state: "green";
       data: {};
-      transitions: {
-        toYellow: Transition<TrafficLightState, "green", "yellow">;
-      };
     }
   | {
       state: "yellow";
       data: {};
-      transitions: { toRed: Transition<TrafficLightState, "yellow", "red"> };
     };
 
-const ts: Transitions<TrafficLightState> = {
+type TrafficLightTransitions = {
+  toGreen: Transition<TrafficLightState, "red", "green">;
+  toYellow: Transition<TrafficLightState, "green", "yellow">;
+  toRed: Transition<TrafficLightState, "yellow", "red">;
+};
+
+const ts: TrafficLightTransitions = {
   toGreen: (s) => ({
     immediate: {
       state: "green",
       data: {},
-      transitions: { toYellow: ts.toYellow },
     },
   }),
   toYellow: (s) => ({
     immediate: {
       state: "yellow",
       data: {},
-      transitions: { toRed: ts.toRed },
     },
   }),
   toRed: (s) => ({
     immediate: {
       state: "red",
       data: {},
-      transitions: { toGreen: ts.toGreen },
     },
   }),
 };
 
 const run = async () => {
-  const machine = createMachine<TrafficLightState>(ts);
+  const machine = createMachine<TrafficLightState, TrafficLightTransitions>(ts);
   let s = machine.init({
     state: "green",
     data: {},
@@ -54,9 +52,9 @@ const run = async () => {
   console.log(s.state);
 
   if (s.state == "green") {
-    s = s.transitions.toYellow(s).immediate || s;
+    s = machine.transitions.toYellow(s).immediate || s;
   } else if (s.state == "yellow") {
-    s = s.transitions.toRed(s).immediate || s;
+    s = machine.transitions.toRed(s).immediate || s;
   }
 
   console.log(s.state);
