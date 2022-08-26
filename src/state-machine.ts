@@ -1,9 +1,9 @@
 import * as React from "react";
 
-type StateTemplate = {
+interface StateTemplate {
   state: string;
   data?: unknown;
-};
+}
 
 type SpecificState<S extends StateTemplate, N extends S["state"]> = S & {
   state: N;
@@ -22,15 +22,7 @@ type Transition<
   S extends StateTemplate,
   FROM extends S["state"],
   TO extends S["state"]
-> = (
-  from: SpecificState<S, FROM>,
-  ...params: any[]
-) => {
-  /**State change that occurs immediately when the transition occurs */
-  immediate?: SpecificState<S, TO>;
-  /**State change that occurs only after some work (represented by a promise) finishes. The work is triggered when the transition occurs */
-  deferred?: (from: S) => Promise<SpecificState<S, TO> | undefined>;
-};
+> = (from: SpecificState<S, FROM>, ...params: any[]) => SpecificState<S, TO>;
 
 /**Type containing all possible transition functions for a specific state machine */
 type Transitions<S extends StateTemplate> = Record<
@@ -38,32 +30,43 @@ type Transitions<S extends StateTemplate> = Record<
   Transition<S, any, any>
 >;
 
-type InitialTransition<S extends StateTemplate> = {
-  /**State change that occurs immediately when the transition occurs */
-  immediate: S;
-  /**State change that occurs only after some work (represented by a promise) finishes. The work is triggered when the transition occurs */
-  deferred?: (from: S) => Promise<S | undefined>;
-};
+type Trigger<
+  S extends StateTemplate,
+  FROM extends S["state"],
+  TO extends S["state"]
+> = (s: SpecificState<S, FROM>) => Promise<SpecificState<S, TO>>;
 
-const createMachine = <S extends StateTemplate, T extends Transitions<S>>(
-  transitions: T
+type Triggers<S extends StateTemplate> = Partial<Record<S["state"], any>>;
+
+const createMachine = <
+  S extends StateTemplate,
+  T extends Transitions<S>,
+  I extends Triggers<S>
+>(
+  transitions: T,
+  triggers: I
 ) => {
   return {
     init: <S1 extends S>(initialState: S1) => {
       return initialState as S;
     },
     transitions,
+    triggers,
   };
 };
 
-const useMachine = <S extends StateTemplate, T extends Transitions<S>>(
+const useMachine = <
+  S extends StateTemplate,
+  T extends Transitions<S>,
+  I extends Triggers<S>
+>(
   transitions: T,
-  initialTransition: () => InitialTransition<S>
+  triggers: I,
+  initialState: S
 ) => {
-  const initialTransitionResult = initialTransition();
   const [state, setState] = React.useState<S>(
     // @ts-ignore TODO: how to make this type safe?
-    createMachine(transitions).init(initialTransitionResult.immediate)
+    createMachine(transitions).init(initialState)
   );
 
   const newTransitions = Object.keys(transitions).reduce(
@@ -72,23 +75,7 @@ const useMachine = <S extends StateTemplate, T extends Transitions<S>>(
         ...acc,
         [transitionKey]: (currentState: S) => {
           const result = transitions[transitionKey](currentState);
-          const immediate = result.immediate;
-          const deferred = result.deferred;
-
-          if (immediate) {
-            setState(immediate);
-          }
-
-          if (deferred) {
-            deferred(state)
-              .then((newState) => newState && setState(newState))
-              .catch((err: any) => {
-                console.error(
-                  "Transitions should never be allowed to fail, should always handle errors. Failed with: " +
-                    err?.message || "Unknown error"
-                );
-              });
-          }
+          setState(result);
         },
       };
     },
@@ -97,13 +84,12 @@ const useMachine = <S extends StateTemplate, T extends Transitions<S>>(
 
   // execute the initial transition, if any
   React.useEffect(() => {
-    if (
-      initialTransitionResult.deferred &&
-      initialTransitionResult.immediate == state
-    ) {
-      initialTransitionResult
-        .deferred(state)
-        .then((newState) => newState && setState(newState))
+    // @ts-ignore TODO: how to make this type safe?
+    const trigger: Trigger<S> = triggers[initialState.state];
+
+    if (trigger) {
+      trigger(initialState)
+        .then(setState)
         .catch((err: any) => {
           console.error(
             "Transitions should never be allowed to fail, should always handle errors. Failed with: " +
@@ -117,4 +103,4 @@ const useMachine = <S extends StateTemplate, T extends Transitions<S>>(
 };
 
 export { createMachine, useMachine };
-export type { InitialTransition, Transition, SpecificState };
+export type { Transition, Trigger, SpecificState };
