@@ -3,13 +3,13 @@ import { createMachine, SpecificState, Trigger } from "../state-machine";
 // define all the possible state for our machine
 type TrafficLightState =
   | {
-      state: "red";
+      status: "red";
     }
   | {
-      state: "green";
+      status: "green";
     }
   | {
-      state: "yellow";
+      status: "yellow";
     };
 
 type TrafficLigthTransitions = {
@@ -27,9 +27,9 @@ type TrafficLighTriggers = {
 };
 
 const triggers: TrafficLighTriggers = {
-  red: (s) => delay(1000, () => ({ state: "green" })),
-  green: (s) => delay(3000, () => ({ state: "yellow" })),
-  yellow: (s) => delay(500, () => ({ state: "red" })),
+  red: (s) => delay(1000, () => ({ status: "green" })),
+  green: (s) => delay(3000, () => ({ status: "yellow" })),
+  yellow: (s) => delay(500, () => ({ status: "red" })),
 };
 
 // infinite loop that will cycle throgh the states
@@ -42,10 +42,10 @@ const run = async () => {
     TrafficLigthTransitions,
     TrafficLighTriggers
   >(ts, triggers);
-  let s = machine.init({ state: "green" });
+  let s = machine.init({ status: "green" });
 
   // loop through the states
-  console.log(new Date().toISOString(), s.state);
+  console.log(new Date().toISOString(), s.status);
   // while (true) {
   //   if (s.state == "green") {
   //     s = machine.transitions.greenToYellow(s);

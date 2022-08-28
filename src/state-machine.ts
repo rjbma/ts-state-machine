@@ -1,12 +1,12 @@
 import * as React from "react";
 
 interface StateTemplate {
-  state: string;
+  status: string;
   data?: unknown;
 }
 
-type SpecificState<S extends StateTemplate, N extends S["state"]> = S & {
-  state: N;
+type SpecificState<S extends StateTemplate, N extends S["status"]> = S & {
+  status: N;
 };
 
 // transform a union type into an intersection type
@@ -20,8 +20,8 @@ type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (
 /**Type for defining a single transition for a specific state machine */
 type Transition<
   S extends StateTemplate,
-  FROM extends S["state"],
-  TO extends S["state"]
+  FROM extends S["status"],
+  TO extends S["status"]
 > = (from: SpecificState<S, FROM>) => SpecificState<S, TO>;
 
 /**Type containing all possible transition functions for a specific state machine */
@@ -32,11 +32,11 @@ type Transitions<S extends StateTemplate> = Record<
 
 type Trigger<
   S extends StateTemplate,
-  FROM extends S["state"],
-  TO extends S["state"]
+  FROM extends S["status"],
+  TO extends S["status"]
 > = (s: SpecificState<S, FROM>) => Promise<SpecificState<S, TO>>;
 
-type Triggers<S extends StateTemplate> = Partial<Record<S["state"], any>>;
+type Triggers<S extends StateTemplate> = Partial<Record<S["status"], any>>;
 
 const createMachine = <
   S extends StateTemplate,
@@ -85,7 +85,7 @@ const useMachine = <
   // execute the initial transition, if any
   React.useEffect(() => {
     // @ts-ignore TODO: how to make this type safe?
-    const trigger: Trigger<S> = triggers[initialState.state];
+    const trigger: Trigger<S> = triggers[initialState.status];
 
     if (trigger) {
       trigger(initialState)
