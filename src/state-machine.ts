@@ -22,12 +22,12 @@ type Transition<
   S extends StateTemplate,
   FROM extends S["state"],
   TO extends S["state"]
-> = (from: SpecificState<S, FROM>, ...params: any[]) => SpecificState<S, TO>;
+> = (from: SpecificState<S, FROM>) => SpecificState<S, TO>;
 
 /**Type containing all possible transition functions for a specific state machine */
 type Transitions<S extends StateTemplate> = Record<
   string,
-  Transition<S, any, any>
+  Transition<S, any, any> | ((...params: any[]) => Transition<S, any, any>)
 >;
 
 type Trigger<
@@ -99,7 +99,7 @@ const useMachine = <
     }
   }, []);
 
-  return { state, transitions: newTransitions };
+  return { state, transitions: newTransitions as T };
 };
 
 export { createMachine, useMachine };
