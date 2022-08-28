@@ -2,20 +2,11 @@ import * as React from "react";
 
 interface StateTemplate {
   status: string;
-  data?: unknown;
 }
 
 type SpecificState<S extends StateTemplate, N extends S["status"]> = S & {
   status: N;
 };
-
-// transform a union type into an intersection type
-// see: https://stackoverflow.com/questions/50374908/transform-union-type-to-intersection-type
-type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (
-  k: infer I
-) => void
-  ? I
-  : never;
 
 /**Type for defining a single transition for a specific state machine */
 type Transition<
@@ -24,10 +15,21 @@ type Transition<
   TO extends S["status"]
 > = (from: SpecificState<S, FROM>) => SpecificState<S, TO>;
 
+/**
+ * Type for defining a single transition for a specific state machine; this transition also
+ * needs additional params (i.e., not contained in the state) to be executed
+ */
+type TransitionWithParams<
+  S extends StateTemplate,
+  FROM extends S["status"],
+  TO extends S["status"],
+  PARAMS
+> = (from: SpecificState<S, FROM>, params: PARAMS) => SpecificState<S, TO>;
+
 /**Type containing all possible transition functions for a specific state machine */
 type Transitions<S extends StateTemplate> = Record<
   string,
-  Transition<S, any, any> | ((...params: any[]) => Transition<S, any, any>)
+  Transition<S, any, any> | TransitionWithParams<S, any, any, any>
 >;
 
 type Trigger<
@@ -66,29 +68,14 @@ const useMachine = <
 ) => {
   const [state, setState] = React.useState<S>(
     // @ts-ignore TODO: how to make this type safe?
-    createMachine(transitions).init(initialState)
+    createMachine(transitions, triggers).init(initialState)
   );
 
-  const newTransitions = Object.keys(transitions).reduce(
-    (acc, transitionKey) => {
-      return {
-        ...acc,
-        [transitionKey]: (currentState: S) => {
-          const result = transitions[transitionKey](currentState);
-          setState(result);
-        },
-      };
-    },
-    {}
-  );
-
-  // execute the initial transition, if any
-  React.useEffect(() => {
-    // @ts-ignore TODO: how to make this type safe?
-    const trigger: Trigger<S> = triggers[initialState.status];
-
+  // checks if the given state has a trigger, and executes it if so
+  const executeTrigger = (state: S) => {
+    const trigger = triggers[state.status as S["status"]];
     if (trigger) {
-      trigger(initialState)
+      trigger(state)
         .then(setState)
         .catch((err: any) => {
           console.error(
@@ -97,10 +84,34 @@ const useMachine = <
           );
         });
     }
+  };
+
+  const newTransitions = Object.keys(transitions).reduce(
+    (acc, transitionKey) => {
+      return {
+        ...acc,
+        [transitionKey]: (currentState: S, additionalParams: any) => {
+          const newState = transitions[transitionKey](
+            currentState,
+            additionalParams
+          );
+          setState((oldState) => {
+            executeTrigger(newState);
+            return newState;
+          });
+        },
+      };
+    },
+    {}
+  );
+
+  // execute the trigger for the initial state, if any
+  React.useEffect(() => {
+    executeTrigger(initialState);
   }, []);
 
   return { state, transitions: newTransitions as T };
 };
 
 export { createMachine, useMachine };
-export type { Transition, Trigger, SpecificState };
+export type { Transition, TransitionWithParams, Trigger, SpecificState };
