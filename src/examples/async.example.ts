@@ -27,9 +27,9 @@ type TrafficLighTriggers = {
 };
 
 const triggers: TrafficLighTriggers = {
-  red: (s) => delay(1000, () => ({ status: "green" })),
-  green: (s) => delay(3000, () => ({ status: "yellow" })),
-  yellow: (s) => delay(500, () => ({ status: "red" })),
+  red: (s) => ({ task: () => delay(1000, () => ({ status: "green" })) }),
+  green: (s) => ({ task: () => delay(3000, () => ({ status: "yellow" })) }),
+  yellow: (s) => ({ task: () => delay(500, () => ({ status: "red" })) }),
 };
 
 // infinite loop that will cycle throgh the states

@@ -36,7 +36,12 @@ type Trigger<
   S extends StateTemplate,
   FROM extends S["status"],
   TO extends S["status"]
-> = (s: SpecificState<S, FROM>) => Promise<SpecificState<S, TO>>;
+> = (s: SpecificState<S, FROM>) =>
+  | Promise<SpecificState<S, TO>>
+  | {
+      task: () => Promise<SpecificState<S, TO>>;
+      cancel?: () => void;
+    };
 
 type Triggers<S extends StateTemplate> = Partial<Record<S["status"], any>>;
 
@@ -66,23 +71,38 @@ const useMachine = <
   triggers: I,
   initialState: S
 ) => {
-  const [state, setState] = React.useState<S>(
+  type InternalState = { value: S; cancel?: () => void };
+  const [state, setState] = React.useState<InternalState>(
     // @ts-ignore TODO: how to make this type safe?
-    createMachine(transitions, triggers).init(initialState)
+    createMachine(transitions, triggers).init({ value: initialState })
   );
+
+  // set the new state, while also cancelling any work scheduled by the previous state
+  const cancelAndSetState = (newState: InternalState) =>
+    setState((currentState) => {
+      currentState.cancel?.();
+      const cancelTrigger = executeTrigger(newState.value);
+      return { value: newState.value, cancel: cancelTrigger };
+    });
 
   // checks if the given state has a trigger, and executes it if so
   const executeTrigger = (state: S) => {
-    const trigger = triggers[state.status as S["status"]];
+    const trigger: Trigger<S, any, any> = triggers[state.status as S["status"]];
     if (trigger) {
-      trigger(state)
-        .then(setState)
+      const res = trigger(state);
+      const task = res instanceof Promise ? res : res.task();
+      const cancel = res instanceof Promise ? () => null : res.cancel;
+      task
+        .then((newState) => {
+          return cancelAndSetState({ value: newState });
+        })
         .catch((err: any) => {
           console.error(
             "Transitions should never be allowed to fail, should always handle errors. Failed with: " +
               err?.message || "Unknown error"
           );
         });
+      return cancel;
     }
   };
 
@@ -95,10 +115,7 @@ const useMachine = <
             currentState,
             additionalParams
           );
-          setState((oldState) => {
-            executeTrigger(newState);
-            return newState;
-          });
+          cancelAndSetState({ value: newState });
         },
       };
     },
@@ -107,7 +124,8 @@ const useMachine = <
 
   // execute the trigger for the initial state, if any
   React.useEffect(() => {
-    executeTrigger(initialState);
+    const cancel = executeTrigger(initialState);
+    return () => cancel?.();
   }, []);
 
   return { state, transitions: newTransitions as T };
