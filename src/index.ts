@@ -4,8 +4,9 @@ import type {
   Trigger,
   SpecificState,
 } from "./state-machine";
-import { AsyncExample } from "./examples/async.example";
+// import { AsyncExample } from "./examples/async.example";
 // import { SyncExample } from "./examples/sync.example";
+import { AsyncExample } from "./examples/data.example";
 import { createMachine, useMachine } from "./state-machine";
 
 AsyncExample.run();
