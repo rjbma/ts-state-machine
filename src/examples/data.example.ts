@@ -1,18 +1,18 @@
 import {
   createMachine,
-  newMachine,
-  SpecificState,
   Transition,
+  TransitionWithParams,
   Trigger,
 } from "../state-machine";
 
 // define all the possible state for our machine
-type ResoureceLoadedState =
+type ResourceLoaderState =
   | {
       status: "idle";
     }
   | {
       status: "loading";
+      errorThreshold: number;
     }
   | {
       status: "loaded";
@@ -23,21 +23,26 @@ type ResoureceLoadedState =
     };
 
 type ResourceLoaderTransitions = {
-  start: Transition<ResoureceLoadedState, "idle", "loading">;
-  reload: Transition<ResoureceLoadedState, "loaded", "loading">;
+  start: TransitionWithParams<
+    ResourceLoaderState,
+    "idle",
+    "loading",
+    { t: number }
+  >;
+  reload: Transition<ResourceLoaderState, "loaded", "loading">;
 };
 
 const ts: ResourceLoaderTransitions = {
-  start: (s) => ({ status: "loading" }),
-  reload: () => ({ status: "loading" }),
+  start: (s, params) => ({ status: "loading", errorThreshold: params.t }),
+  reload: () => ({ status: "loading", errorThreshold: 0 }),
 };
 
 type ResourceLoadedTiggers = {
-  loading: Trigger<ResoureceLoadedState, "loading", "error" | "loaded">;
+  loading: Trigger<ResourceLoaderState, "loading", "error" | "loaded">;
 };
 
 const triggers: ResourceLoadedTiggers = {
-  loading: () => getResource(),
+  loading: (s) => getResource(s.errorThreshold),
 };
 
 // infinite loop that will cycle throgh the states
@@ -45,27 +50,27 @@ const run = async () => {
   console.log("started");
 
   // create the machine with the definitions above
-  const machine = newMachine<
-    ResoureceLoadedState,
+  const machine = createMachine<
+    ResourceLoaderState,
     ResourceLoaderTransitions,
     ResourceLoadedTiggers
   >(ts, triggers, { status: "idle" });
 
-  console.log(new Date().toISOString(), machine.currentState.value);
+  console.log(new Date().toISOString(), machine.state);
 
-  machine.transitions.start({ status: "idle" });
-  console.log(new Date().toISOString(), machine.currentState.value);
+  machine.transitions.start({ status: "idle" }, { t: 0.5 });
+  console.log(new Date().toISOString(), machine.state);
 
   await new Promise((resolve) => setTimeout(resolve, 2000));
-  console.log(new Date().toISOString(), machine.currentState.value);
+  console.log(new Date().toISOString(), machine.state);
 
-  if (machine.currentState.value.status == "loaded") {
-    machine.transitions.reload(machine.currentState.value);
-    console.log(new Date().toISOString(), machine.currentState.value);
+  if (machine.state.status == "loaded") {
+    machine.transitions.reload(machine.state);
+    console.log(new Date().toISOString(), machine.state);
   }
 
   await new Promise((resolve) => setTimeout(resolve, 2000));
-  console.log(new Date().toISOString(), machine.currentState.value);
+  console.log(new Date().toISOString(), machine.state);
 
   // while (true) {
   //   console.log(new Date().toISOString(), machine.currentState.value);
@@ -84,11 +89,12 @@ const delay = <T>(duration: number, fn: () => T): Promise<T> =>
 const AsyncExample = { run };
 export { AsyncExample };
 
-async function getResource(): Promise<
-  ResoureceLoadedState & { status: "error" | "loaded" }
-> {
+async function getResource(
+  threshold: number
+): Promise<ResourceLoaderState & { status: "error" | "loaded" }> {
   const value = Math.random();
-  if (value < 0.7) {
+  console.log("got", value);
+  if (value < threshold) {
     return { status: "error" };
   } else {
     return { status: "loaded", value };

@@ -12,11 +12,7 @@ type TrafficLightState =
       status: "yellow";
     };
 
-type TrafficLigthTransitions = {
-  // redToGreen: Transition<TrafficLightState, "red", "green">;
-  // greenToYellow: Transition<TrafficLightState, "green", "yellow">;
-  // yellowToRed: Transition<TrafficLightState, "yellow", "red">;
-};
+type TrafficLigthTransitions = {};
 
 const ts: TrafficLigthTransitions = {};
 
@@ -41,11 +37,10 @@ const run = async () => {
     TrafficLightState,
     TrafficLigthTransitions,
     TrafficLighTriggers
-  >(ts, triggers);
-  let s = machine.init({ status: "green" });
+  >(ts, triggers, { status: "green" });
 
   // loop through the states
-  console.log(new Date().toISOString(), s.status);
+  console.log(new Date().toISOString(), machine.state.status);
   // while (true) {
   //   if (s.state == "green") {
   //     s = machine.transitions.greenToYellow(s);
