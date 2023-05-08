@@ -1,0 +1,1 @@
+Simple example of using **ts-state-machine** in a React app.
