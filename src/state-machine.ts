@@ -49,12 +49,17 @@ const createMachine = <
   S extends StateTemplate,
   T extends Transitions<S>,
   I extends Triggers<S>
->(
-  transitions: T,
-  triggers: I,
-  onStateChange: (s: S) => void,
-  initialState: S
-) => {
+>({
+  transitions,
+  triggers,
+  onStateChange,
+  initialState,
+}: {
+  transitions: T;
+  triggers: I;
+  onStateChange?: (s: S) => void;
+  initialState: S;
+}) => {
   type InternalState = { value: S; cancel?: () => void };
   const internalState: InternalState = { value: initialState };
 
@@ -71,7 +76,7 @@ const createMachine = <
     internalState.cancel = cancelTrigger;
 
     // signal the state of the machine has changed
-    onStateChange(internalState.value);
+    onStateChange?.(internalState.value);
   };
 
   // checks if the given state has a trigger, and executes it if so
@@ -142,15 +147,14 @@ const useMachine = <
   });
   const machine = React.useMemo(
     () =>
-      createMachine(
+      createMachine({
         transitions,
         triggers,
-        (newState) => {
-          console.log("changed", newState);
+        onStateChange: (newState) => {
           setState({ value: newState });
         },
-        initialState
-      ),
+        initialState,
+      }),
     [transitions, triggers]
   );
 

@@ -37,7 +37,7 @@ const run = async () => {
     TrafficLightState,
     TrafficLigthTransitions,
     TrafficLighTriggers
-  >(ts, triggers, { status: "green" });
+  >({ transitions: ts, triggers, initialState: { status: "green" } });
 
   // loop through the states
   console.log(new Date().toISOString(), machine.state.status);

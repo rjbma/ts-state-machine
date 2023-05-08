@@ -54,7 +54,7 @@ const run = async () => {
     ResourceLoaderState,
     ResourceLoaderTransitions,
     ResourceLoadedTiggers
-  >(ts, triggers, { status: "idle" });
+  >({ transitions: ts, triggers, initialState: { status: "idle" } });
 
   console.log(new Date().toISOString(), machine.state);
 
