@@ -1,111 +1,189 @@
 import * as React from "react";
 
-type StateTemplate = {
-  state: string;
-  data: unknown;
-  transitions: Record<string, unknown>;
-};
+interface StateTemplate {
+  status: string;
+}
 
-type SpecificState<S extends StateTemplate, N extends S["state"]> = S & {
-  state: N;
+type SpecificState<S extends StateTemplate, N extends S["status"]> = S & {
+  status: N;
 };
-
-// transform a union type into an intersection type
-// see: https://stackoverflow.com/questions/50374908/transform-union-type-to-intersection-type
-type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (
-  k: infer I
-) => void
-  ? I
-  : never;
 
 /**Type for defining a single transition for a specific state machine */
 type Transition<
   S extends StateTemplate,
-  FROM extends S["state"],
-  TO extends S["state"]
-> = (from: SpecificState<S, FROM>) => {
-  /**State change that occurs immediately when the transition occurs */
-  immediate?: SpecificState<S, TO>;
-  /**State change that occurs only after some work (represented by a promise) finishes. The work is triggered when the transition occurs */
-  deferred?: () => Promise<SpecificState<S, TO>>;
-};
+  FROM extends S["status"],
+  TO extends S["status"]
+> = (from: SpecificState<S, FROM>) => SpecificState<S, TO>;
+
+/**
+ * Type for defining a single transition for a specific state machine; this transition also
+ * needs additional params (i.e., not contained in the state) to be executed
+ */
+type TransitionWithParams<
+  S extends StateTemplate,
+  FROM extends S["status"],
+  TO extends S["status"],
+  PARAMS
+> = (from: SpecificState<S, FROM>, params: PARAMS) => SpecificState<S, TO>;
 
 /**Type containing all possible transition functions for a specific state machine */
-type Transitions<S extends StateTemplate> = UnionToIntersection<
-  S["transitions"]
+type Transitions<S extends StateTemplate> = Record<
+  string,
+  Transition<S, any, any> | TransitionWithParams<S, any, any, any>
 >;
 
-type InitialTransition<S extends StateTemplate> = {
-  /**State change that occurs immediately when the transition occurs */
-  immediate: S;
-  /**State change that occurs only after some work (represented by a promise) finishes. The work is triggered when the transition occurs */
-  deferred?: () => Promise<S>;
-};
-
-const createMachine = <S extends StateTemplate>(
-  transitions: Transitions<S>
-) => {
-  return {
-    init: <S1 extends S>(initialState: S1) => {
-      return initialState as S;
-    },
-    transitions,
-  };
-};
-
-const useMachine = <S extends StateTemplate>(
-  transitions: Transitions<S>,
-  initialTransition: () => InitialTransition<S>
-) => {
-  const initialTransitionResult = initialTransition();
-  const [state, setState] = React.useState(
-    createMachine(transitions).init(initialTransitionResult.immediate)
-  );
-
-  Object.keys(state.transitions).forEach((transitionKey) => {
-    state.transitions[transitionKey] = (currentState: S) => {
-      // @ts-ignore TODO: how to make this type safe?
-      const result = transitions[transitionKey](currentState);
-      const immediate: S = result.immediate;
-      const deferred: () => Promise<S> = result.deferred;
-
-      if (immediate) {
-        setState(immediate);
-      }
-
-      if (deferred) {
-        deferred()
-          .then(setState)
-          .catch((err: any) => {
-            console.error(
-              "Transitions should never be allowed to fail, should always handle errors. Failed with: " +
-                err?.message || "Unknown error"
-            );
-          });
-      }
+type Trigger<
+  S extends StateTemplate,
+  FROM extends S["status"],
+  TO extends S["status"]
+> = (s: SpecificState<S, FROM>) =>
+  | Promise<SpecificState<S, TO>>
+  | {
+      task: () => Promise<SpecificState<S, TO>>;
+      cancel?: () => void;
     };
-  });
 
-  // execute the initial transition, if any
-  React.useEffect(() => {
-    if (
-      initialTransitionResult.deferred &&
-      initialTransitionResult.immediate == state
-    ) {
-      initialTransitionResult
-        .deferred()
-        .then(setState)
+type Triggers<S extends StateTemplate> = Partial<Record<S["status"], any>>;
+
+const createMachine = <
+  S extends StateTemplate,
+  T extends Transitions<S>,
+  I extends Triggers<S>
+>(
+  transitions: T,
+  triggers: I,
+  initialState: S
+) => {
+  type InternalState = { value: S; cancel?: () => void };
+  const currentState: InternalState = { value: initialState };
+
+  // set the new state, while also cancelling any work scheduled by the previous state
+  const cancelAndSetState = (newState: InternalState) => {
+    currentState.cancel?.();
+    const cancelTrigger = executeTrigger(newState.value);
+
+    replaceObjectProps(currentState.value, newState.value);
+    currentState.cancel = cancelTrigger;
+  };
+
+  // checks if the given state has a trigger, and executes it if so
+  const executeTrigger = (state: S) => {
+    const trigger: Trigger<S, any, any> = triggers[state.status as S["status"]];
+    if (trigger) {
+      const res = trigger(state);
+      const task = res instanceof Promise ? res : res.task();
+      const cancel = res instanceof Promise ? () => null : res.cancel;
+      task
+        .then((newState) => {
+          return cancelAndSetState({ value: newState });
+        })
         .catch((err: any) => {
           console.error(
             "Transitions should never be allowed to fail, should always handle errors. Failed with: " +
               err?.message || "Unknown error"
           );
         });
+      return cancel;
     }
-  }, []);
+  };
 
-  return state;
+  const newTransitions = Object.keys(transitions).reduce(
+    (acc, transitionKey) => {
+      return {
+        ...acc,
+        [transitionKey]: (currentState: S, additionalParams: any) => {
+          const newState = transitions[transitionKey](
+            currentState,
+            additionalParams
+          );
+          cancelAndSetState({ value: newState });
+        },
+      };
+    },
+    {}
+  );
+
+  // execute the trigger for the initial state, if any
+  executeTrigger(currentState.value);
+
+  return { state: currentState.value, transitions: newTransitions as T };
 };
 
-export { createMachine, useMachine };
-export type { InitialTransition, Transition, Transitions, SpecificState };
+const useMachine = <
+  S extends StateTemplate,
+  T extends Transitions<S>,
+  I extends Triggers<S>
+>(
+  transitions: T,
+  triggers: I,
+  initialState: S
+) => {
+  type InternalState = { value: S; cancel?: () => void };
+  const [state, setState] = React.useState<InternalState>({
+    value: initialState,
+  });
+
+  // set the new state, while also cancelling any work scheduled by the previous state
+  const cancelAndSetState = (newState: InternalState) =>
+    setState((currentState) => {
+      currentState.cancel?.();
+      const cancelTrigger = executeTrigger(newState.value);
+      return { value: newState.value, cancel: cancelTrigger };
+    });
+
+  // checks if the given state has a trigger, and executes it if so
+  const executeTrigger = (state: S) => {
+    const trigger: Trigger<S, any, any> = triggers[state.status as S["status"]];
+    if (trigger) {
+      const res = trigger(state);
+      const task = res instanceof Promise ? res : res.task();
+      const cancel = res instanceof Promise ? () => null : res.cancel;
+      task
+        .then((newState) => {
+          return cancelAndSetState({ value: newState });
+        })
+        .catch((err: any) => {
+          console.error(
+            "Transitions should never be allowed to fail, should always handle errors. Failed with: " +
+              err?.message || "Unknown error"
+          );
+        });
+      return cancel;
+    }
+  };
+
+  const newTransitions = Object.keys(transitions).reduce(
+    (acc, transitionKey) => {
+      return {
+        ...acc,
+        [transitionKey]: (currentState: S, additionalParams: any) => {
+          const newState = transitions[transitionKey](
+            currentState,
+            additionalParams
+          );
+          cancelAndSetState({ value: newState });
+        },
+      };
+    },
+    {}
+  );
+
+  // execute the trigger for the initial state, if any
+  React.useEffect(() => {
+    const cancel = executeTrigger(initialState);
+    return () => cancel?.();
+  }, []);
+
+  return { state, transitions: newTransitions as T };
+};
+
+const replaceObjectProps = (oldObject: any, newObject: any) => {
+  for (const key in oldObject) {
+    delete oldObject[key];
+  }
+  Object.assign(oldObject, newObject);
+  return oldObject;
+};
+
+export { useMachine, createMachine };
+export type { Transition, TransitionWithParams, Trigger, SpecificState };
