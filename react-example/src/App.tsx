@@ -6,20 +6,34 @@ import viteLogo from "/vite.svg";
 
 function App() {
   const { state, transitions } = useTrafficLightStateMachine();
+  const [value, setValue] = useState(0);
   const [count, setCount] = useState(0);
-
-  const color = state.status;
 
   return (
     <>
       <div>
-        {state.status == "disabled" ? (
-          <button onClick={() => transitions.start(state)}>start</button>
-        ) : (
+        {state.status == "disabled" && (
+          <>
+            <input
+              value={value}
+              onChange={(e) => setValue(Number(e.target.value))}
+            ></input>
+            <button
+              onClick={() =>
+                transitions.start(state, { additionalInfo: value })
+              }
+            >
+              start
+            </button>
+          </>
+        )}
+        {(state.status == "red" || state.status == "yellow") && (
           <button onClick={() => transitions.stop(state)}>stop</button>
         )}
         {state.status != "disabled" ? (
-          <div style={{ height: 100, backgroundColor: color }}></div>
+          <div style={{ height: 100, backgroundColor: state.status }}>
+            {state.a}
+          </div>
         ) : (
           <div></div>
         )}

@@ -1,4 +1,9 @@
-import { Transition, Trigger, useMachine } from "../../src/state-machine";
+import {
+  Transition,
+  TransitionWithParams,
+  Trigger,
+  useMachine,
+} from "../../src/state-machine";
 
 // define all the possible state for our machine
 type TrafficLightState =
@@ -7,22 +12,30 @@ type TrafficLightState =
     }
   | {
       status: "red";
+      a: number;
     }
   | {
       status: "green";
+      a: number;
     }
   | {
       status: "yellow";
+      a: number;
     };
 
 // there are no "manual" transitions between states
 type TrafficLigthTransitions = {
-  start: Transition<TrafficLightState, "disabled", "green">;
-  stop: Transition<TrafficLightState, "green" | "red" | "yellow", "disabled">;
+  start: TransitionWithParams<
+    TrafficLightState,
+    "disabled",
+    "green",
+    { additionalInfo: number }
+  >;
+  stop: Transition<TrafficLightState, "red" | "yellow", "disabled">;
 };
 const ts: TrafficLigthTransitions = {
-  start: () => ({ status: "green" }),
-  stop: () => ({ status: "disabled" }),
+  start: (s, params) => ({ status: "green", a: params.additionalInfo }),
+  stop: (s) => ({ status: "disabled", a: s.a }),
 };
 
 type TrafficLighTriggers = {
@@ -31,9 +44,13 @@ type TrafficLighTriggers = {
   yellow: Trigger<TrafficLightState, "yellow", "red">;
 };
 const triggers: TrafficLighTriggers = {
-  red: () => ({ task: () => delay(5000, () => ({ status: "green" })) }),
-  green: () => ({ task: () => delay(5000, () => ({ status: "yellow" })) }),
-  yellow: () => ({ task: () => delay(5000, () => ({ status: "red" })) }),
+  red: (s) => delay(5000, () => ({ status: "green", a: s.a })),
+  green: (s) => ({
+    task: () => delay(5000, () => ({ status: "yellow", a: s.a })),
+  }),
+  yellow: (s) => ({
+    task: () => delay(5000, () => ({ status: "red", a: s.a })),
+  }),
 };
 
 const delay = <T>(duration: number, fn: () => T): Promise<T> =>
