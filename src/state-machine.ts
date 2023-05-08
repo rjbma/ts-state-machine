@@ -52,18 +52,26 @@ const createMachine = <
 >(
   transitions: T,
   triggers: I,
+  onStateChange: (s: S) => void,
   initialState: S
 ) => {
   type InternalState = { value: S; cancel?: () => void };
-  const currentState: InternalState = { value: initialState };
+  const internalState: InternalState = { value: initialState };
 
   // set the new state, while also cancelling any work scheduled by the previous state
   const cancelAndSetState = (newState: InternalState) => {
-    currentState.cancel?.();
+    // cancel any pending tasks on the old state
+    internalState.cancel?.();
+
+    // start tasks of the new state, and get a function for cancelling in the future, in case it's needed
     const cancelTrigger = executeTrigger(newState.value);
 
-    replaceObjectProps(currentState.value, newState.value);
-    currentState.cancel = cancelTrigger;
+    // update the internal state of the machine
+    replaceObjectProps(internalState.value, newState.value);
+    internalState.cancel = cancelTrigger;
+
+    // signal the state of the machine has changed
+    onStateChange(internalState.value);
   };
 
   // checks if the given state has a trigger, and executes it if so
@@ -72,10 +80,21 @@ const createMachine = <
     if (trigger) {
       const res = trigger(state);
       const task = res instanceof Promise ? res : res.task();
-      const cancel = res instanceof Promise ? () => null : res.cancel;
+      let isCancelled = false;
+      const cancel =
+        res instanceof Promise
+          ? () => {
+              isCancelled = true;
+            }
+          : () => {
+              isCancelled = true;
+              res.cancel?.();
+            };
       task
         .then((newState) => {
-          return cancelAndSetState({ value: newState });
+          if (!isCancelled) {
+            return cancelAndSetState({ value: newState });
+          }
         })
         .catch((err: any) => {
           console.error(
@@ -104,9 +123,9 @@ const createMachine = <
   );
 
   // execute the trigger for the initial state, if any
-  executeTrigger(currentState.value);
+  executeTrigger(internalState.value);
 
-  return { state: currentState.value, transitions: newTransitions as T };
+  return { state: internalState.value, transitions: newTransitions as T };
 };
 
 const useMachine = <
@@ -118,63 +137,24 @@ const useMachine = <
   triggers: I,
   initialState: S
 ) => {
-  type InternalState = { value: S; cancel?: () => void };
-  const [state, setState] = React.useState<InternalState>({
+  const [state, setState] = React.useState<{ value: S }>({
     value: initialState,
   });
-
-  // set the new state, while also cancelling any work scheduled by the previous state
-  const cancelAndSetState = (newState: InternalState) =>
-    setState((currentState) => {
-      currentState.cancel?.();
-      const cancelTrigger = executeTrigger(newState.value);
-      return { value: newState.value, cancel: cancelTrigger };
-    });
-
-  // checks if the given state has a trigger, and executes it if so
-  const executeTrigger = (state: S) => {
-    const trigger: Trigger<S, any, any> = triggers[state.status as S["status"]];
-    if (trigger) {
-      const res = trigger(state);
-      const task = res instanceof Promise ? res : res.task();
-      const cancel = res instanceof Promise ? () => null : res.cancel;
-      task
-        .then((newState) => {
-          return cancelAndSetState({ value: newState });
-        })
-        .catch((err: any) => {
-          console.error(
-            "Transitions should never be allowed to fail, should always handle errors. Failed with: " +
-              err?.message || "Unknown error"
-          );
-        });
-      return cancel;
-    }
-  };
-
-  const newTransitions = Object.keys(transitions).reduce(
-    (acc, transitionKey) => {
-      return {
-        ...acc,
-        [transitionKey]: (currentState: S, additionalParams: any) => {
-          const newState = transitions[transitionKey](
-            currentState,
-            additionalParams
-          );
-          cancelAndSetState({ value: newState });
+  const machine = React.useMemo(
+    () =>
+      createMachine(
+        transitions,
+        triggers,
+        (newState) => {
+          console.log("changed", newState);
+          setState({ value: newState });
         },
-      };
-    },
-    {}
+        initialState
+      ),
+    [transitions, triggers]
   );
 
-  // execute the trigger for the initial state, if any
-  React.useEffect(() => {
-    const cancel = executeTrigger(initialState);
-    return () => cancel?.();
-  }, []);
-
-  return { state, transitions: newTransitions as T };
+  return { state: state.value, transitions: machine.transitions };
 };
 
 const replaceObjectProps = (oldObject: any, newObject: any) => {
@@ -185,5 +165,5 @@ const replaceObjectProps = (oldObject: any, newObject: any) => {
   return oldObject;
 };
 
-export { useMachine, createMachine };
+export { createMachine, useMachine };
 export type { Transition, TransitionWithParams, Trigger, SpecificState };
