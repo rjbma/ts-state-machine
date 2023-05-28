@@ -58,6 +58,34 @@ type Trigger<S extends StateTemplate> =
 
 type Triggers<S extends StateTemplate> = Partial<Record<S["status"], any>>;
 
+type Events<S extends StateTemplate> = {
+  /**This is called every time the machine changes states */
+  onStateChange?: (newState: S) => void;
+  /**
+   * This is called when a trigger's task is finished, but the system detects that
+   * the current state is no longer the state that initiated the trigger, and the
+   * trigger was never canceled.
+   *
+   * Usually this shouldn't happen, since tasks are cancelled when a transition is
+   * executed on a machine and a trigger's task is still being executed. However it's
+   * been known to happen on hot reloading, for example. This can be used as a hook
+   * for debugging and reporting on these situations.
+   */
+  onTriggerStateChangeIgnored?: (params: {
+    expectedState: { state: S; stateId: StateId };
+    actualState: { state: S; stateId: StateId };
+    ignoredState: S | void;
+  }) => void;
+  /**
+   * Async tasks from triggers are not supposed to fail, they should always
+   * return the next state for the machine. This function will be called should
+   * the task fail, which most likely indicates a bug in your state machine.
+   */
+  onTriggerFailure?: (err: Error) => void;
+};
+
+type StateId = number;
+
 const createMachine = <
   S extends StateTemplate,
   T extends Transitions<S>,
@@ -65,16 +93,31 @@ const createMachine = <
 >({
   transitions,
   triggers,
-  onStateChange,
   initialState,
+  events = {
+    onTriggerStateChangeIgnored: ({ expectedState, actualState }) => {
+      console.warn(
+        `Ignored trigger. Original state: ${expectedState.state.status}/${expectedState.stateId}. Current state: ${actualState.state.status}/${actualState.stateId}`
+      );
+    },
+    onTriggerFailure: (err) => {
+      console.error(
+        "Transitions should never be allowed to fail, should always handle errors. Failed with: " +
+          err?.message || "Unknown error"
+      );
+    },
+  },
 }: {
   transitions: T;
   triggers: I;
-  onStateChange?: (s: S) => void;
   initialState: S;
+  events: Events<S>;
 }) => {
-  type InternalState = { value: S; cancel?: () => void };
-  const internalState: InternalState = { value: initialState };
+  type InternalState = { value: S; cancel?: () => void; stateId: StateId };
+  const internalState: InternalState = {
+    value: initialState,
+    stateId: uniqueId(),
+  };
 
   // set the new state, while also cancelling any work scheduled by the previous state
   const cancelAndSetState = (newState: S | undefined) => {
@@ -82,20 +125,24 @@ const createMachine = <
     internalState.cancel?.();
 
     if (newState !== undefined) {
+      // generate a unique ID for the new state
+      const newStateId = uniqueId();
+
       // start tasks of the new state, and get a function for cancelling in the future, in case it's needed
-      const cancelTrigger = executeTrigger(newState);
+      const cancelTrigger = executeTrigger(newState, newStateId);
 
       // update the internal state of the machine
+      internalState.stateId = newStateId;
       replaceObjectProps(internalState.value, newState);
       internalState.cancel = cancelTrigger;
 
       // signal the state of the machine has changed
-      onStateChange?.(internalState.value);
+      events.onStateChange?.({ ...internalState.value });
     }
   };
 
   // checks if the given state has a trigger, and executes it if so
-  const executeTrigger = (state: S) => {
+  const executeTrigger = (state: S, stateId: StateId) => {
     const trigger: Trigger<S> = triggers[state.status as S["status"]];
     if (trigger) {
       const res = trigger(state);
@@ -112,15 +159,26 @@ const createMachine = <
             };
       task
         .then((newState) => {
+          // if the trigger was cancelled, don't change state
           if (!isCancelled) {
-            return cancelAndSetState(newState || undefined);
+            // if the current state is no longer the exact same state that it
+            // was when the trigger was activated, also don't change state
+            if (stateId === internalState.stateId) {
+              return cancelAndSetState(newState || undefined);
+            } else {
+              events.onTriggerStateChangeIgnored?.({
+                expectedState: { state, stateId },
+                actualState: {
+                  state: internalState.value,
+                  stateId: internalState.stateId,
+                },
+                ignoredState: newState,
+              });
+            }
           }
         })
         .catch((err: any) => {
-          console.error(
-            "Transitions should never be allowed to fail, should always handle errors. Failed with: " +
-              err?.message || "Unknown error"
-          );
+          events.onTriggerFailure?.(err);
         });
       return cancel;
     }
@@ -143,7 +201,11 @@ const createMachine = <
   );
 
   // execute the trigger for the initial state, if any
-  executeTrigger(internalState.value);
+  const cancelTrigger = executeTrigger(
+    internalState.value,
+    internalState.stateId
+  );
+  internalState.cancel = cancelTrigger;
 
   return { state: internalState.value, transitions: newTransitions as T };
 };
@@ -165,10 +227,12 @@ const useMachine = <
       createMachine({
         transitions,
         triggers,
-        onStateChange: (newState) => {
-          setState({ value: newState });
-        },
         initialState,
+        events: {
+          onStateChange: (newState) => {
+            setState({ value: newState });
+          },
+        },
       }),
     [transitions, triggers]
   );
@@ -184,6 +248,8 @@ const replaceObjectProps = (oldObject: any, newObject: any) => {
   return oldObject;
 };
 
+const uniqueId = (): StateId => Math.random();
+
 export { createMachine, useMachine };
 export type {
   Transition,
@@ -191,4 +257,5 @@ export type {
   SimpleTrigger,
   NoOpTrigger,
   SpecificState,
+  Events,
 };

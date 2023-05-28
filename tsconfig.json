@@ -1,4 +1,5 @@
 {
+  "exclude": ["react-example", "dist"],
   "compilerOptions": {
     /* Basic Options */
     // "incremental": true,                   /* Enable incremental compilation */

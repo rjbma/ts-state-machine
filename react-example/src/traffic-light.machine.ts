@@ -29,13 +29,13 @@ type TrafficLigthTransitions = {
   start: TransitionWithParams<
     TrafficLightState,
     "disabled",
-    "green",
+    "yellow",
     { additionalInfo: number }
   >;
   stop: Transition<TrafficLightState, "red" | "yellow", "disabled">;
 };
 const ts: TrafficLigthTransitions = {
-  start: (_, params) => ({ status: "green", a: params.additionalInfo }),
+  start: (_, params) => ({ status: "yellow", a: params.additionalInfo }),
   stop: (s) => ({ status: "disabled", a: s.a }),
 };
 
@@ -45,32 +45,54 @@ type TrafficLighTriggers = {
   yellow: SimpleTrigger<TrafficLightState, "yellow", "red">;
   disabled: NoOpTrigger<TrafficLightState, "disabled">;
 };
-const triggers: TrafficLighTriggers = {
-  red: (s) => delay(5000, () => ({ status: "green", a: s.a })),
+const triggers = (config: {
+  redDuration: number;
+  greenDuration: number;
+  yellowDuration: number;
+  disabledDuration: number;
+}): TrafficLighTriggers => ({
+  red: (s) => delay(config.redDuration, () => ({ status: "green", a: s.a })),
   green: (s) => ({
-    task: () => delay(5000, () => ({ status: "yellow", a: s.a })),
+    task: () =>
+      delay(config.greenDuration, () => ({ status: "yellow", a: s.a })),
   }),
   yellow: (s) => ({
-    task: () => delay(5000, () => ({ status: "red", a: s.a })),
+    task: () => delay(config.yellowDuration, () => ({ status: "red", a: s.a })),
   }),
   disabled: async () => {
     console.log("Just disabled the traffic light.");
-    await delay(10000, () => undefined);
-    console.log("Traffic light still disabled after 10s");
+    await delay(config.disabledDuration, () => undefined);
+    console.log(
+      `Traffic light still disabled after ${config.disabledDuration}ms`
+    );
   },
-};
+});
 
 const delay = <T>(duration: number, fn: () => T): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(fn()), duration));
+
+const trafficLightMachineProps = {
+  transitions: ts,
+  triggers,
+};
 
 const useTrafficLightStateMachine = () => {
   const machine = useMachine<
     TrafficLightState,
     TrafficLigthTransitions,
     TrafficLighTriggers
-  >(ts, triggers, { status: "disabled" });
+  >(
+    ts,
+    triggers({
+      disabledDuration: 10000,
+      greenDuration: 5000,
+      yellowDuration: 5000,
+      redDuration: 5000,
+    }),
+    { status: "disabled" }
+  );
   return machine;
 };
 
-export { useTrafficLightStateMachine };
+export { useTrafficLightStateMachine, trafficLightMachineProps };
 export type { TrafficLightState, TrafficLigthTransitions, TrafficLighTriggers };

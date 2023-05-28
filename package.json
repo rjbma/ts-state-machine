@@ -14,7 +14,8 @@
     "start": "nodemon src/index.ts",
     "prepublishOnly": "npm run build",
     "build": "tsc",
-    "test": "jest --watch",
+    "test": "node --experimental-vm-modules ./node_modules/.bin/jest --runInBand",
+    "test:watch": "node --inspect=0 --experimental-vm-modules ./node_modules/.bin/jest --watchAll --maxWorkers=1",
     "coverage": "jest --watch --coverage"
   },
   "author": "rjbma",
