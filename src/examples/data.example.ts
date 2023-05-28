@@ -2,7 +2,7 @@ import {
   createMachine,
   Transition,
   TransitionWithParams,
-  Trigger,
+  SimpleTrigger,
 } from "../state-machine";
 
 // define all the possible state for our machine
@@ -38,7 +38,7 @@ const ts: ResourceLoaderTransitions = {
 };
 
 type ResourceLoadedTiggers = {
-  loading: Trigger<ResourceLoaderState, "loading", "error" | "loaded">;
+  loading: SimpleTrigger<ResourceLoaderState, "loading", "error" | "loaded">;
 };
 
 const triggers: ResourceLoadedTiggers = {

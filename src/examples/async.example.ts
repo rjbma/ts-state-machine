@@ -1,4 +1,4 @@
-import { createMachine, SpecificState, Trigger } from "../state-machine";
+import { createMachine, SpecificState, SimpleTrigger } from "../state-machine";
 
 // define all the possible state for our machine
 type TrafficLightState =
@@ -17,9 +17,9 @@ type TrafficLigthTransitions = {};
 const ts: TrafficLigthTransitions = {};
 
 type TrafficLighTriggers = {
-  red: Trigger<TrafficLightState, "red", "green">;
-  green: Trigger<TrafficLightState, "green", "yellow">;
-  yellow: Trigger<TrafficLightState, "yellow", "red">;
+  red: SimpleTrigger<TrafficLightState, "red", "green">;
+  green: SimpleTrigger<TrafficLightState, "green", "yellow">;
+  yellow: SimpleTrigger<TrafficLightState, "yellow", "red">;
 };
 
 const triggers: TrafficLighTriggers = {

@@ -111,7 +111,7 @@ const createMachine = <
   transitions: T;
   triggers: I;
   initialState: S;
-  events: Events<S>;
+  events?: Events<S>;
 }) => {
   type InternalState = { value: S; cancel?: () => void; stateId: StateId };
   const internalState: InternalState = {

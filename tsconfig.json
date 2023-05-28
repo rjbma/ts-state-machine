@@ -1,5 +1,6 @@
 {
-  "exclude": ["react-example", "dist"],
+  "include": ["src/index.ts", "src/**/*.d.ts"],
+  "exclude": ["node_modules", "react-example", "dist"],
   "compilerOptions": {
     /* Basic Options */
     // "incremental": true,                   /* Enable incremental compilation */
