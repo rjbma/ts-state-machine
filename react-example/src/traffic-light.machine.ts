@@ -45,7 +45,7 @@ type TrafficLighTriggers = {
   yellow: SimpleTrigger<TrafficLightState, "yellow", "red">;
   disabled: NoOpTrigger<TrafficLightState, "disabled">;
 };
-const triggers = (config: {
+const triggerFn = (config: {
   redDuration: number;
   greenDuration: number;
   yellowDuration: number;
@@ -68,12 +68,19 @@ const triggers = (config: {
   },
 });
 
+const triggers = triggerFn({
+  disabledDuration: 10000,
+  greenDuration: 5000,
+  yellowDuration: 5000,
+  redDuration: 5000,
+});
+
 const delay = <T>(duration: number, fn: () => T): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(fn()), duration));
 
 const trafficLightMachineProps = {
   transitions: ts,
-  triggers,
+  triggers: triggerFn,
 };
 
 const useTrafficLightStateMachine = () => {
@@ -81,16 +88,7 @@ const useTrafficLightStateMachine = () => {
     TrafficLightState,
     TrafficLigthTransitions,
     TrafficLighTriggers
-  >(
-    ts,
-    triggers({
-      disabledDuration: 10000,
-      greenDuration: 5000,
-      yellowDuration: 5000,
-      redDuration: 5000,
-    }),
-    { status: "disabled" }
-  );
+  >(ts, triggers, { status: "disabled" });
   return machine;
 };
 
