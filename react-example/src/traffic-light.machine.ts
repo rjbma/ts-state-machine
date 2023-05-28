@@ -1,8 +1,9 @@
 import {
   Transition,
   TransitionWithParams,
-  Trigger,
+  SimpleTrigger,
   useMachine,
+  NoOpTrigger,
 } from "../../src/state-machine";
 
 // define all the possible state for our machine
@@ -34,14 +35,15 @@ type TrafficLigthTransitions = {
   stop: Transition<TrafficLightState, "red" | "yellow", "disabled">;
 };
 const ts: TrafficLigthTransitions = {
-  start: (s, params) => ({ status: "green", a: params.additionalInfo }),
+  start: (_, params) => ({ status: "green", a: params.additionalInfo }),
   stop: (s) => ({ status: "disabled", a: s.a }),
 };
 
 type TrafficLighTriggers = {
-  red: Trigger<TrafficLightState, "red", "green">;
-  green: Trigger<TrafficLightState, "green", "yellow">;
-  yellow: Trigger<TrafficLightState, "yellow", "red">;
+  red: SimpleTrigger<TrafficLightState, "red", "green">;
+  green: SimpleTrigger<TrafficLightState, "green", "yellow">;
+  yellow: SimpleTrigger<TrafficLightState, "yellow", "red">;
+  disabled: NoOpTrigger<TrafficLightState, "disabled">;
 };
 const triggers: TrafficLighTriggers = {
   red: (s) => delay(5000, () => ({ status: "green", a: s.a })),
@@ -51,6 +53,11 @@ const triggers: TrafficLighTriggers = {
   yellow: (s) => ({
     task: () => delay(5000, () => ({ status: "red", a: s.a })),
   }),
+  disabled: async () => {
+    console.log("Just disabled the traffic light.");
+    await delay(10000, () => undefined);
+    console.log("Traffic light still disabled after 10s");
+  },
 };
 
 const delay = <T>(duration: number, fn: () => T): Promise<T> =>

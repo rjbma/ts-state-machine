@@ -32,7 +32,7 @@ type Transitions<S extends StateTemplate> = Record<
   Transition<S, any, any> | TransitionWithParams<S, any, any, any>
 >;
 
-type Trigger<
+type SimpleTrigger<
   S extends StateTemplate,
   FROM extends S["status"],
   TO extends S["status"]
@@ -42,6 +42,19 @@ type Trigger<
       task: () => Promise<SpecificState<S, TO>>;
       cancel?: () => void;
     };
+
+type NoOpTrigger<S extends StateTemplate, FROM extends S["status"]> = (
+  s: SpecificState<S, FROM>
+) =>
+  | Promise<void>
+  | {
+      task: () => Promise<void>;
+      cancel?: () => void;
+    };
+
+type Trigger<S extends StateTemplate> =
+  | SimpleTrigger<S, any, any>
+  | NoOpTrigger<S, any>;
 
 type Triggers<S extends StateTemplate> = Partial<Record<S["status"], any>>;
 
@@ -64,24 +77,26 @@ const createMachine = <
   const internalState: InternalState = { value: initialState };
 
   // set the new state, while also cancelling any work scheduled by the previous state
-  const cancelAndSetState = (newState: InternalState) => {
+  const cancelAndSetState = (newState: S | undefined) => {
     // cancel any pending tasks on the old state
     internalState.cancel?.();
 
-    // start tasks of the new state, and get a function for cancelling in the future, in case it's needed
-    const cancelTrigger = executeTrigger(newState.value);
+    if (newState !== undefined) {
+      // start tasks of the new state, and get a function for cancelling in the future, in case it's needed
+      const cancelTrigger = executeTrigger(newState);
 
-    // update the internal state of the machine
-    replaceObjectProps(internalState.value, newState.value);
-    internalState.cancel = cancelTrigger;
+      // update the internal state of the machine
+      replaceObjectProps(internalState.value, newState);
+      internalState.cancel = cancelTrigger;
 
-    // signal the state of the machine has changed
-    onStateChange?.(internalState.value);
+      // signal the state of the machine has changed
+      onStateChange?.(internalState.value);
+    }
   };
 
   // checks if the given state has a trigger, and executes it if so
   const executeTrigger = (state: S) => {
-    const trigger: Trigger<S, any, any> = triggers[state.status as S["status"]];
+    const trigger: Trigger<S> = triggers[state.status as S["status"]];
     if (trigger) {
       const res = trigger(state);
       const task = res instanceof Promise ? res : res.task();
@@ -98,7 +113,7 @@ const createMachine = <
       task
         .then((newState) => {
           if (!isCancelled) {
-            return cancelAndSetState({ value: newState });
+            return cancelAndSetState(newState || undefined);
           }
         })
         .catch((err: any) => {
@@ -120,7 +135,7 @@ const createMachine = <
             currentState,
             additionalParams
           );
-          cancelAndSetState({ value: newState });
+          cancelAndSetState(newState || undefined);
         },
       };
     },
@@ -170,4 +185,10 @@ const replaceObjectProps = (oldObject: any, newObject: any) => {
 };
 
 export { createMachine, useMachine };
-export type { Transition, TransitionWithParams, Trigger, SpecificState };
+export type {
+  Transition,
+  TransitionWithParams,
+  SimpleTrigger,
+  NoOpTrigger,
+  SpecificState,
+};
