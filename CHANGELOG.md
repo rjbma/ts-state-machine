@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.5.0](https://github.com/rjbma/ts-state-machine/compare/v0.4.3...v0.5.0) (2023-07-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* remove `NoOpTriggers`. Instead, a trigger can now have a `void` target state, in which case, the state machine remains in the same state
+
+### Features
+
+* remove `NoOpTriggers`. Instead, a trigger can now have a `void` target state, in which case, the state machine remains in the same state ([c3eb1e7](https://github.com/rjbma/ts-state-machine/commit/c3eb1e770ae12263ee048fca20d18beb5346cf9a))
+* when using `useMachine` (on a React app), make sure the initial trigger is run only once ([d236466](https://github.com/rjbma/ts-state-machine/commit/d2364669fa71ccb65bb4708fa206a5d558adec46))
+
 ### 0.4.3 (2023-07-14)
 
 
