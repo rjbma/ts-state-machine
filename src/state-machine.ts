@@ -201,13 +201,24 @@ const createMachine = <
   );
 
   // execute the trigger for the initial state, if any
-  const cancelTrigger = executeTrigger(
-    internalState.value,
-    internalState.stateId
-  );
-  internalState.cancel = cancelTrigger;
+  const start = () => {
+    const cancelTrigger = executeTrigger(
+      internalState.value,
+      internalState.stateId
+    );
+    internalState.cancel = cancelTrigger;
 
-  return { state: internalState.value, transitions: newTransitions as T };
+    return {
+      state: internalState.value,
+      transitions: newTransitions as T,
+    };
+  };
+
+  return {
+    state: internalState.value,
+    transitions: newTransitions as T,
+    start,
+  };
 };
 
 const useMachine = <
@@ -219,9 +230,7 @@ const useMachine = <
   triggers: I,
   initialState: S
 ) => {
-  const [state, setState] = React.useState<{ value: S }>({
-    value: initialState,
-  });
+  const [state, setState] = React.useState<S>(initialState);
   const machine = React.useMemo(
     () =>
       createMachine({
@@ -230,14 +239,37 @@ const useMachine = <
         initialState,
         events: {
           onStateChange: (newState) => {
-            setState({ value: newState });
+            setState(newState);
           },
         },
       }),
-    [transitions, triggers]
+    [transitions, triggers, initialState]
   );
 
-  return { state: state.value, transitions: machine.transitions };
+  // Make sure the state machine is only started once (i.e, the trigger for its initial state is only executed once)
+  //
+  // This is needed because of React's strict mode, which would execute the trigger twice. Most of the time this
+  // shouldn't really be a problem, but some trigger may have actions that cannot be replayed!
+  useEffectOnlyOnce(() => {
+    machine.start();
+  });
+
+  return { state, transitions: machine.transitions };
+};
+
+/**
+ * Same as `React.useEffect` but runs the effect only once. Usefull for using
+ * with React's strict mode, when the effect cannot be run more than once (e.g.,
+ * a non-idempotent HTTP request to a server)
+ */
+const useEffectOnlyOnce = (fn: () => any) => {
+  const ref = React.useRef(false);
+  React.useEffect(() => {
+    if (!ref.current) {
+      ref.current = true;
+      fn();
+    }
+  }, [fn]);
 };
 
 const replaceObjectProps = (oldObject: any, newObject: any) => {

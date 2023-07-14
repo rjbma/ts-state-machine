@@ -25,7 +25,7 @@ const createTrafficLightMachine = (
     }),
     initialState,
     events,
-  });
+  }).start();
 };
 
 describe("a state machine", () => {
