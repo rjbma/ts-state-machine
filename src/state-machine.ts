@@ -32,29 +32,16 @@ type Transitions<S extends StateTemplate> = Record<
   Transition<S, any, any> | TransitionWithParams<S, any, any, any>
 >;
 
-type SimpleTrigger<
+type Trigger<
   S extends StateTemplate,
   FROM extends S["status"],
-  TO extends S["status"]
+  TO extends S["status"] | void
 > = (s: SpecificState<S, FROM>) =>
-  | Promise<SpecificState<S, TO>>
+  | Promise<TO extends S["status"] ? SpecificState<S, TO> : void>
   | {
-      task: () => Promise<SpecificState<S, TO>>;
+      task: () => Promise<TO extends S["status"] ? SpecificState<S, TO> : void>;
       cancel?: () => void;
     };
-
-type NoOpTrigger<S extends StateTemplate, FROM extends S["status"]> = (
-  s: SpecificState<S, FROM>
-) =>
-  | Promise<void>
-  | {
-      task: () => Promise<void>;
-      cancel?: () => void;
-    };
-
-type Trigger<S extends StateTemplate> =
-  | SimpleTrigger<S, any, any>
-  | NoOpTrigger<S, any>;
 
 type Triggers<S extends StateTemplate> = Partial<Record<S["status"], any>>;
 
@@ -120,7 +107,7 @@ const createMachine = <
   };
 
   // set the new state, while also cancelling any work scheduled by the previous state
-  const cancelAndSetState = (newState: S | undefined) => {
+  const cancelAndSetState = (newState: S | void) => {
     // cancel any pending tasks on the old state
     internalState.cancel?.();
 
@@ -143,7 +130,7 @@ const createMachine = <
 
   // checks if the given state has a trigger, and executes it if so
   const executeTrigger = (state: S, stateId: StateId) => {
-    const trigger: Trigger<S> = triggers[state.status as S["status"]];
+    const trigger: Trigger<S, any, any> = triggers[state.status as S["status"]];
     if (trigger) {
       const res = trigger(state);
       const task = res instanceof Promise ? res : res.task();
@@ -286,8 +273,7 @@ export { createMachine, useMachine };
 export type {
   Transition,
   TransitionWithParams,
-  SimpleTrigger,
-  NoOpTrigger,
+  Trigger,
   SpecificState,
   Events,
 };

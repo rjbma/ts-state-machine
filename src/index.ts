@@ -1,8 +1,7 @@
 import type {
   Transition,
   TransitionWithParams,
-  SimpleTrigger,
-  NoOpTrigger,
+  Trigger,
   SpecificState,
   Events,
 } from "./state-machine";
@@ -12,8 +11,7 @@ export { createMachine, useMachine };
 export type {
   Transition,
   TransitionWithParams,
-  SimpleTrigger,
-  NoOpTrigger,
+  Trigger,
   SpecificState,
   Events,
 };

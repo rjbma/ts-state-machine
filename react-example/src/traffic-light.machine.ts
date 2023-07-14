@@ -1,9 +1,8 @@
 import {
   Transition,
   TransitionWithParams,
-  SimpleTrigger,
+  Trigger,
   useMachine,
-  NoOpTrigger,
 } from "../../src/state-machine";
 
 // define all the possible state for our machine
@@ -40,10 +39,10 @@ const ts: TrafficLigthTransitions = {
 };
 
 type TrafficLighTriggers = {
-  red: SimpleTrigger<TrafficLightState, "red", "green">;
-  green: SimpleTrigger<TrafficLightState, "green", "yellow">;
-  yellow: SimpleTrigger<TrafficLightState, "yellow", "red">;
-  disabled: NoOpTrigger<TrafficLightState, "disabled">;
+  red: Trigger<TrafficLightState, "red", "green">;
+  green: Trigger<TrafficLightState, "green", "yellow">;
+  yellow: Trigger<TrafficLightState, "yellow", "red">;
+  disabled: Trigger<TrafficLightState, "disabled", void>;
 };
 const triggerFn = (config: {
   redDuration: number;
